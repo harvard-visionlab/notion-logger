@@ -15,6 +15,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "notion-client>=1.0.0",
+        "pandas",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
