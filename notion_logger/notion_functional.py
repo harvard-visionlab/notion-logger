@@ -344,3 +344,75 @@ def row_to_plain_text(row, schema):
             plain_text_row[key] = None  # Unsupported property types can be handled as needed
 
     return plain_text_row
+
+
+def get_page_blocks(client, page_id):
+    """
+    Get all blocks from a Notion template.
+    """
+    response = client.blocks.children.list(block_id=page_id)
+    return response['results']
+
+def append_block(client, page_id, block_type, block_content):
+    """
+    Append a new block to a Notion page.
+    """
+    response = client.blocks.children.append(
+        block_id=page_id,
+        children=[
+            {
+                "object": "block",
+                "type": block_type,
+                block_type: block_content
+            }
+        ]
+    )
+    return response
+
+def append_heading_with_code(client, page_id, toggle_text, code_text, heading="heading_3", is_toggleable=True):
+    """
+    Append a new toggle heading 3 block with a code block inside it to a page.
+    """
+    toggle_block_content = {
+        "rich_text": [
+            {
+                "type": "text",
+                "text": {
+                    "content": toggle_text,
+                    "link": None
+                },
+                "annotations": {
+                    "bold": True,
+                    "italic": False,
+                    "strikethrough": False,
+                    "underline": False,
+                    "code": False,
+                    "color": "default"
+                }
+            }
+        ],
+        "is_toggleable": True,
+        "color": "default"
+    }
+
+    code_block_content = {
+        "language": "plain text",
+        "rich_text": [
+            {
+                "type": "text",
+                "text": {
+                    "content": code_text,
+                    "link": None
+                }
+            }
+        ]
+    }
+
+    # Append the toggle heading block first
+    toggle_response = append_block(client, page_id, heading, toggle_block_content)
+    toggle_block_id = toggle_response['results'][0]['id']
+
+    # Append the code block inside the toggle block
+    code_response = append_block(client, toggle_block_id, "code", code_block_content)
+    
+    return {"toggle_block": toggle_response, "code_block": code_response}

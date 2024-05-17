@@ -102,4 +102,18 @@ class NotionLogger(object):
             archived=True
         )
         return response
+        
+    def list_blocks(self, page_id):
+        """
+        List all blocks in a page.
+        """
+        blocks = F.get_page_blocks(self.client, page_id)
+        return blocks
+    
+    def append_code_block(self, page_id, toggle_text, code_text):
+        """
+        Append a new toggle header 3 block with a code block inside it to a page.
+        """
+        response = F.append_heading_with_code(self.client, page_id, toggle_text, code_text)
+        return response
     
