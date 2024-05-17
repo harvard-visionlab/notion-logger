@@ -1,4 +1,5 @@
 import pandas as pd
+from pdb import set_trace
 
 def get_database_id(client, database_name):
     """
@@ -10,19 +11,19 @@ def get_database_id(client, database_name):
             return result.get("id")
     raise ValueError(f"Database with name '{database_name}' not found")
 
-def get_database_schemas(client, database_id):
+def get_database_schema(client, database_id):
     """
     Get information about each table within the database (their names, ids, field properties, etc.).
     """
     database_info = client.databases.retrieve(database_id=database_id)
-    schemas = {}
+    schema = {}
     for prop_name, prop_info in database_info["properties"].items():
-        schemas[prop_name] = {
+        schema[prop_name] = {
             "id": prop_info["id"],
             "type": prop_info["type"],
             "details": prop_info
         }
-    return schemas
+    return schema
 
 def get_database_rows(client, database_id, filters=None, sorts=None, page_size=100):
     """
@@ -96,3 +97,162 @@ def notion_rows_to_dataframe(rows):
 
     df = pd.DataFrame(data)
     return df
+
+def format_properties(schema, row_data):
+    formatted_properties = {}
+
+    for key, value in row_data.items():
+        if key not in schema:
+            raise ValueError(f"Property '{key}' does not exist in the database schema.")
+
+        prop_schema = schema[key]
+        prop_type = prop_schema['type']
+
+        if prop_type == 'title':
+            formatted_properties[key] = {
+                "title": [
+                    {
+                        "text": {
+                            "content": value
+                        }
+                    }
+                ]
+            }
+        elif prop_type == 'rich_text':
+            formatted_properties[key] = {
+                "rich_text": [
+                    {
+                        "text": {
+                            "content": value
+                        }
+                    }
+                ]
+            }
+        elif prop_type == 'number':
+            formatted_properties[key] = {"number": value}
+        elif prop_type == 'select':
+            formatted_properties[key] = {"select": {"name": value}}
+        elif prop_type == 'multi_select':
+            formatted_properties[key] = {"multi_select": [{"name": v} for v in value]}
+        elif prop_type == 'date':
+            formatted_properties[key] = {"date": {"start": value}}
+        elif prop_type == 'checkbox':
+            formatted_properties[key] = {"checkbox": value}
+        elif prop_type == 'url':
+            formatted_properties[key] = {"url": value}
+        elif prop_type == 'email':
+            formatted_properties[key] = {"email": value}
+        elif prop_type == 'phone_number':
+            formatted_properties[key] = {"phone_number": value}
+        elif prop_type == 'created_time' or prop_type == 'last_edited_time':
+            # These are automatically managed by Notion, so no need to set them
+            continue
+        else:
+            raise ValueError(f"Unsupported property type '{prop_type}' for property '{key}'.")
+
+    return formatted_properties
+
+def insert_row(client, database_id, schema, row_data):
+    """
+    Insert a new row into the Notion database.
+    """
+    formatted_properties = format_properties(schema, row_data)
+    response = client.pages.create(
+        parent={"database_id": database_id},
+        properties=formatted_properties
+    )
+    return response
+
+def is_property_unique(client, database_id, schema, property_name, value):
+    """
+    Check if a given value for a property is unique in the database.
+    """
+    if property_name not in schema:
+        raise ValueError(f"Property '{property_name}' does not exist in the database schema.")
+
+    prop_type = schema[property_name]['type']
+    
+    filters = {
+        "property": property_name
+    }
+
+    if prop_type == 'title':
+        filters['title'] = {"equals": value}
+    elif prop_type == 'rich_text':
+        filters['rich_text'] = {"equals": value}
+    elif prop_type == 'number':
+        filters['number'] = {"equals": value}
+    elif prop_type == 'select':
+        filters['select'] = {"equals": value}
+    elif prop_type == 'multi_select':
+        filters['multi_select'] = {"contains": value}
+    elif prop_type == 'date':
+        filters['date'] = {"equals": value}
+    elif prop_type == 'checkbox':
+        filters['checkbox'] = {"equals": value}
+    elif prop_type == 'url':
+        filters['url'] = {"equals": value}
+    elif prop_type == 'email':
+        filters['email'] = {"equals": value}
+    elif prop_type == 'phone_number':
+        filters['phone_number'] = {"equals": value}
+    else:
+        raise ValueError(f"Unsupported property type '{prop_type}' for property '{property_name}'.")
+
+    response = client.databases.query(database_id=database_id, filter=filters)
+    return len(response['results']) == 0
+
+def find_row_by_unique_property(client, database_id, schema, property_name, value):
+    """
+    Find a row by a unique property in the Notion database.
+    """
+    if property_name not in schema:
+        raise ValueError(f"Property '{property_name}' does not exist in the database schema.")
+
+    prop_type = schema[property_name]['type']
+    
+    filters = {
+        "property": property_name
+    }
+
+    if prop_type == 'title':
+        filters['title'] = {"equals": value}
+    elif prop_type == 'rich_text':
+        filters['rich_text'] = {"equals": value}
+    elif prop_type == 'number':
+        filters['number'] = {"equals": value}
+    elif prop_type == 'select':
+        filters['select'] = {"equals": value}
+    elif prop_type == 'multi_select':
+        filters['multi_select'] = {"contains": value}
+    elif prop_type == 'date':
+        filters['date'] = {"equals": value}
+    elif prop_type == 'checkbox':
+        filters['checkbox'] = {"equals": value}
+    elif prop_type == 'url':
+        filters['url'] = {"equals": value}
+    elif prop_type == 'email':
+        filters['email'] = {"equals": value}
+    elif prop_type == 'phone_number':
+        filters['phone_number'] = {"equals": value}
+    else:
+        raise ValueError(f"Unsupported property type '{prop_type}' for property '{property_name}'.")
+
+    response = client.databases.query(database_id=database_id, filter=filters)
+    if len(response['results']) == 0:
+        raise ValueError(f"No row found with {property_name} = {value}")
+    elif len(response['results']) > 1:
+        raise ValueError(f"Multiple rows found with {property_name} = {value}")
+
+    return response['results'][0]
+
+def update_row(client, row_id, schema, row_data):
+    """
+    Update a row in the Notion database.
+    """
+    formatted_properties = format_properties(schema, row_data)
+    response = client.pages.update(
+        page_id=row_id,
+        properties=formatted_properties
+    )
+    return response
