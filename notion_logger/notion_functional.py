@@ -256,3 +256,91 @@ def update_row(client, row_id, schema, row_data):
         properties=formatted_properties
     )
     return response
+
+def build_filter(schema, filter_dict):
+    """
+    Build a Notion filter from a dictionary of property names and values.
+    """
+    filters = []
+    
+    for key, value in filter_dict.items():
+        if key not in schema:
+            raise ValueError(f"Property '{key}' does not exist in the database schema.")
+
+        prop_type = schema[key]['type']
+        filter_condition = {"property": key}
+        
+        if prop_type == 'title':
+            filter_condition['title'] = {"equals": value}
+        elif prop_type == 'rich_text':
+            filter_condition['rich_text'] = {"equals": value}
+        elif prop_type == 'number':
+            filter_condition['number'] = {"equals": value}
+        elif prop_type == 'select':
+            filter_condition['select'] = {"equals": value}
+        elif prop_type == 'multi_select':
+            filter_condition['multi_select'] = {"contains": value}
+        elif prop_type == 'date':
+            filter_condition['date'] = {"equals": value}
+        elif prop_type == 'checkbox':
+            filter_condition['checkbox'] = {"equals": value}
+        elif prop_type == 'url':
+            filter_condition['url'] = {"equals": value}
+        elif prop_type == 'email':
+            filter_condition['email'] = {"equals": value}
+        elif prop_type == 'phone_number':
+            filter_condition['phone_number'] = {"equals": value}
+        else:
+            raise ValueError(f"Unsupported property type '{prop_type}' for property '{key}'.")
+
+        filters.append(filter_condition)
+    
+    return {"and": filters}
+
+def get_filtered_rows(client, database_id, schema, filter_dict):
+    """
+    Get rows from the Notion database based on a filter dictionary.
+    """
+    notion_filter = build_filter(schema, filter_dict)
+    response = client.databases.query(database_id=database_id, filter=notion_filter)
+    return response['results']
+
+def row_to_plain_text(row, schema):
+    """
+    Convert a Notion row to a plain text dictionary.
+    """
+    properties = row['properties']
+    plain_text_row = {"id": row['id']}
+    
+    for key, value in properties.items():
+        if key not in schema:
+            continue
+
+        prop_type = schema[key]['type']
+
+        if prop_type in ['title', 'rich_text']:
+            plain_text_row[key] = value[prop_type][0]['plain_text'] if value[prop_type] else ""
+        elif prop_type == 'number':
+            plain_text_row[key] = value['number']
+        elif prop_type == 'select':
+            plain_text_row[key] = value['select']['name'] if value['select'] else None
+        elif prop_type == 'multi_select':
+            plain_text_row[key] = [option['name'] for option in value['multi_select']]
+        elif prop_type == 'date':
+            plain_text_row[key] = value['date']['start'] if value['date'] else None
+        elif prop_type == 'checkbox':
+            plain_text_row[key] = value['checkbox']
+        elif prop_type == 'url':
+            plain_text_row[key] = value['url']
+        elif prop_type == 'email':
+            plain_text_row[key] = value['email']
+        elif prop_type == 'phone_number':
+            plain_text_row[key] = value['phone_number']
+        elif prop_type == 'created_time':
+            plain_text_row[key] = value['created_time']
+        elif prop_type == 'last_edited_time':
+            plain_text_row[key] = value['last_edited_time']
+        else:
+            plain_text_row[key] = None  # Unsupported property types can be handled as needed
+
+    return plain_text_row
