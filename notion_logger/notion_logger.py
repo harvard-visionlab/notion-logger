@@ -1,4 +1,4 @@
-import .notion_functional as F
+from . import notion_functional as F
 
 __all__ = ['NotionLogger']
 
