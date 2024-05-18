@@ -117,3 +117,31 @@ class NotionLogger(object):
         response = F.append_heading_with_code(self.client, page_id, toggle_text, code_text)
         return response
     
+    def append_callout_block(self, page_id, callout_text, emoji='💡', text_color='default', background_color='gray_background'):
+        """
+        Append a new toggle header 3 block with a code block inside it to a page.
+        """
+        block = dict(
+            block_type='callout',
+            content=callout_text, 
+            emoji=emoji,
+            text_color=text_color,
+            background_color=background_color
+        )
+        response = F.append_block(self.client, page_id, block)        
+        return response
+    
+    def append_block(self, page_id, block_type, content, color='default'):
+        """
+        Append a block to a Notion page.
+        """
+        response = F.append_block(self.client, page_id, block)
+        return response
+
+    def append_nested_blocks(self, page_id, toggle_block_content, toggle_block_type, *blocks):
+        """
+        Append a toggle block with nested blocks to a Notion page.
+        """
+        response = F.append_nested_blocks(self.client, page_id, toggle_block_content, toggle_block_type, *blocks)
+        return response
+    

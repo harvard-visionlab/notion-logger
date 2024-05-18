@@ -345,6 +345,9 @@ def row_to_plain_text(row, schema):
 
     return plain_text_row
 
+# ================================================================
+#  Code for adding blocks to a page
+# ================================================================
 
 def get_page_blocks(client, page_id):
     """
@@ -416,3 +419,102 @@ def append_heading_with_code(client, page_id, toggle_text, code_text, heading="h
     code_response = append_block(client, toggle_block_id, "code", code_block_content)
     
     return {"toggle_block": toggle_response, "code_block": code_response}
+
+def _format_paragraph(content, color='default'):
+    return {
+        "type": "paragraph",
+        "paragraph": {
+            "rich_text": [{"type": "text", "text": {"content": content}, "annotations": {"color": color}}],
+            "color": color
+        }
+    }
+
+def _format_heading(content, heading_type, color='default', is_toggleable=False):
+    return {
+        "type": heading_type,
+        heading_type: {
+            "rich_text": [{"type": "text", "text": {"content": content}, "annotations": {"color": color}}],
+            "is_toggleable": is_toggleable,
+            "color": color
+        }
+    }
+
+def _format_code(content, language='python', color='default'):
+    return {
+        "type": "code",
+        "code": {
+            "rich_text": [{"type": "text", "text": {"content": content}, "annotations": {"color": color}}],
+            "language": language,
+            "color": color
+        }
+    }
+
+def _format_callout(content, emoji='💡', text_color='default', background_color='gray_background'):
+    return {
+        "type": "callout",
+        "callout": {
+            "rich_text": [{"type": "text", "text": {"content": content}, "annotations": {"color": text_color}}],
+            "icon": {"type": "emoji", "emoji": emoji},
+            "color": background_color
+        }
+    }
+
+def _format_divider():
+    return {
+        "type": "divider",
+        "divider": {}
+    }
+
+def format_block(block):
+    block_type = block['block_type']
+    content = block['content']
+    color = block.get('color', 'default')
+
+    if block_type == 'paragraph':
+        return _format_paragraph(content, color)
+    elif block_type in ['heading_1', 'heading_2', 'heading_3']:
+        is_toggleable = block.get('is_toggleable', False)
+        return _format_heading(content, block_type, color, is_toggleable)
+    elif block_type == 'code':
+        language = block.get('language', 'python')
+        return _format_code(content, language, color)
+    elif block_type == 'callout':
+        emoji = block.get('emoji', '💡')
+        text_color = block.get('text_color', 'default')
+        background_color = block.get('background_color', 'gray_background')        
+        return _format_callout(content, emoji, text_color, background_color)
+    elif block_type == 'divider':
+        return _format_divider()
+    else:
+        raise ValueError(f"Unsupported block type: {block_type}")
+
+def append_block(client, page_id, block):
+    formatted_block = format_block(block)
+    response = client.blocks.children.append(
+        block_id=page_id,
+        children=[formatted_block]
+    )
+    return response
+
+def append_nested_blocks(client, page_id, toggle_block_content, toggle_block_type, *blocks):
+    toggle_block = format_block({
+        'block_type': toggle_block_type,
+        'content': toggle_block_content,
+        'is_toggleable': True
+    })
+    toggle_response = client.blocks.children.append(
+        block_id=page_id,
+        children=[toggle_block]
+    )
+    toggle_block_id = toggle_response['results'][0]['id']
+
+    nested_responses = []
+    for block in blocks:
+        nested_block = format_block(block)
+        nested_response = client.blocks.children.append(
+            block_id=toggle_block_id,
+            children=[nested_block]
+        )
+        nested_responses.append(nested_response)
+
+    return {"toggle_block": toggle_response, "nested_blocks": nested_responses}
