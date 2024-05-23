@@ -1,4 +1,9 @@
 import pandas as pd
+import matplotlib.pyplot as plt
+import base64
+import requests
+from io import BytesIO
+
 from pdb import set_trace
 
 def get_database_id(client, database_name):
@@ -459,6 +464,27 @@ def _format_callout(content, emoji='💡', text_color='default', background_colo
         }
     }
 
+def _format_image(image_url, caption):
+    image_block = {
+        "type": "image",
+        "image": {
+            "type": "external",
+            "external": {
+                "url": image_url
+            },            
+        }
+    }
+    
+    if caption is not None:
+        image_block["image"]["caption"] = [{
+            "type": "text",
+            "text": {
+                "content": caption
+            }
+        }]
+        
+    return image_block
+    
 def _format_divider():
     return {
         "type": "divider",
@@ -485,6 +511,10 @@ def format_block(block):
         return _format_callout(content, emoji, text_color, background_color)
     elif block_type == 'divider':
         return _format_divider()
+    elif block_type == 'image':
+        image_url = content
+        caption = block.get('caption', None)
+        return _format_image(image_url, caption)
     else:
         raise ValueError(f"Unsupported block type: {block_type}")
 
@@ -518,3 +548,71 @@ def append_nested_blocks(client, page_id, toggle_block_content, toggle_block_typ
         nested_responses.append(nested_response)
 
     return {"toggle_block": toggle_response, "nested_blocks": nested_responses}
+
+def append_image_block(client, page_id, image_base64, caption=""):
+    
+    response = client.blocks.children.append(
+        block_id=page_id,
+        children=[image_block]
+    )
+    return response
+
+def get_signed_url(client, page_id, filename):
+    response = client.blocks.children.append(
+        block_id=page_id,
+        children=[
+            {
+                "object": "block",
+                "type": "file",
+                "file": {
+                    "caption": [],
+                    "type": "file",
+                    "file": {
+                        "url": f"file://{filename}"
+                    }
+                }
+            }
+        ]
+    )
+    file_block = response['results'][0]
+    signed_url = file_block['file']['file']['url']
+    return signed_url, file_block['id']
+
+def upload_image_to_signed_url(signed_url, image_binary, content_type='image/png'):
+    headers = {'Content-Type': content_type}
+    response = requests.put(signed_url, data=image_binary, headers=headers)
+    response.raise_for_status()
+
+def upload_figure(client, page_id, fig):
+    image_binary = _fig_to_binary(fig)
+
+    # Get a signed URL from Notion
+    signed_url, file_block_id = get_signed_url(client, page_id, "figure.png")
+
+    # Upload the image to the signed URL
+    upload_image_to_signed_url(signed_url, image_binary)
+
+    # Get the URL of the uploaded image
+    image_url = f"https://www.notion.so/image/{file_block_id}"
+    
+    return image_url
+
+def _fig_to_base64(fig, fmt='png'):    
+    buf = BytesIO()
+    fig.savefig(buf, format=fmt)
+    plt.close(fig)
+    buf.seek(0)
+    
+    # Encode the image in base64
+    image_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    
+    return image_base64
+
+def _fig_to_binary(fig, fmt='png'):
+    buf = BytesIO()
+    fig.savefig(buf, format=fmt)
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+    
+    

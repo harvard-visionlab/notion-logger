@@ -131,6 +131,22 @@ class NotionLogger(object):
         response = F.append_block(self.client, page_id, block)        
         return response
     
+    def append_figure_block(self, page_id, toggle_text, fig, caption=None):
+        raise NotImplementedError("Appending figures is not yet implemented (not officially supported by notion).")
+        #image_url = F.upload_figure(self.client, page_id, fig)        
+        #block = dict(block_type="image", toggle_text=toggle_text, content=image_url, caption=caption)
+        #response = F.append_block(self.client, page_id, block)        
+        #return response
+    
+    def append_image_block(self, page_id, toggle_text, url, caption=None):
+        """
+        Append a new toggle header 3 block with a figure inside it to a page.
+        """   
+        raise NotImplementedError("Appending images is not yet implemented (not officially supported by notion).")
+        # block = dict(block_type="image", toggle_text=toggle_text, content=url, caption=caption)
+        # response = F.append_block(self.client, page_id, block)        
+        # return response        
+    
     def append_block(self, page_id, block_type, content, color='default'):
         """
         Append a block to a Notion page.
