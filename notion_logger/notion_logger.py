@@ -77,6 +77,25 @@ class NotionLogger(object):
         response = F.insert_row(self.client, self.database_id, self.schema, row_data)
         return response
     
+    def insert_or_update(self, row_data, unique_property=None):
+        if unique_property is None:
+            unique_property = self.unique_property
+            
+        if unique_property and unique_property not in row_data:
+            raise ValueError(f"A value for '{unique_property}' must be provided to enforce the unique_property constraint.")
+        
+        response = None
+        if unique_property:
+            is_unique = F.is_property_unique(self.client, self.database_id, self.schema, unique_property, row_data[unique_property])
+            if is_unique:
+                response = F.insert_row(self.client, self.database_id, self.schema, row_data)                
+            else:
+                response = self.update_row(row_data, unique_property=unique_property)
+        else:
+            response = F.insert_row(self.client, self.database_id, self.schema, row_data)
+        
+        return response
+        
     def update_row(self, row_data, unique_property=None):
         if unique_property is None:
             unique_property = self.unique_property
